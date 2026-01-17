@@ -1,1 +1,6 @@
-find "A1 Files" -type d -name "__pycache__" -print0 | xargs -0 git rm -r --cached
+cat >> .gitignore <<'EOF'
+
+# Ignore autograder artifacts under A1 Files
+A1 Files/**/__pycache__/
+A1 Files/results.txt
+EOF
