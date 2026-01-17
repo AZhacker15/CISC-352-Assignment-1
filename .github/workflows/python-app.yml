@@ -37,8 +37,6 @@ jobs:
             pip install -r ../requirements.txt
           fi
 
-      # 跑 autograder，并把 stdout/stderr 同时保存
-      # 注意：autograder 可能会返回非 0（因为有 FAIL），我们仍然要继续后面的步骤保存 results.txt
       - name: Run autograder (always continue)
         run: |
           set +e
@@ -52,22 +50,21 @@ jobs:
 
       - name: Extract FAIL/ERROR from results.txt
         run: |
-          # 统计 FAIL/ERROR
           fail_count=$(grep -cE ' ... FAIL$' results.txt || true)
           err_count=$(grep -cE ' ... ERROR$' results.txt || true)
+
+          echo "FAIL_COUNT=$fail_count" >> "$GITHUB_ENV"
+          echo "ERROR_COUNT=$err_count" >> "$GITHUB_ENV"
 
           echo "FAIL count:  $fail_count"
           echo "ERROR count: $err_count"
 
-          # 提取测试名（去掉末尾的 "... FAIL/ERROR"）
           grep -E ' ... (FAIL|ERROR)$' results.txt \
             | sed -E 's/ \.\.\. (FAIL|ERROR)$//' \
             > fail_list.txt || true
 
-          # 保留原始 FAIL/ERROR 行
           grep -E ' ... (FAIL|ERROR)$' results.txt > fail_raw_lines.txt || true
 
-          # 生成汇总
           {
             echo "FAIL count:  $fail_count"
             echo "ERROR count: $err_count"
@@ -79,7 +76,6 @@ jobs:
           echo "---- fail_summary.txt ----"
           cat fail_summary.txt
 
-      # 上传产物：results.txt + 运行日志 + fail 提取结果
       - name: Upload artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -93,9 +89,19 @@ jobs:
             A1 Files/fail_list.txt
             A1 Files/fail_raw_lines.txt
 
-      # 最后根据 autograder 的退出码决定 job 是否失败（可选）
-      # 如果你希望：即使有 FAIL 也不要让 Actions 红掉，可以把这个步骤删除
-      - name: Fail job if autograder returned non-zero
+      # ✅ 只要 results.txt 里有任何 FAIL/ERROR，就让 job 失败
+      - name: Fail if any FAIL/ERROR in results.txt
+        run: |
+          echo "FAIL_COUNT=${FAIL_COUNT:-0}, ERROR_COUNT=${ERROR_COUNT:-0}"
+          if [ "${FAIL_COUNT:-0}" -gt 0 ] || [ "${ERROR_COUNT:-0}" -gt 0 ]; then
+            echo "Found FAIL/ERROR in results.txt. Failing the job."
+            exit 1
+          fi
+          echo "No FAIL/ERROR found."
+
+      # （可选）如果你还想同时要求 autograder 退出码也必须是 0，就保留这一段
+      # 否则你可以删除它，因为上面已经保证“有 FAIL/ERROR 就失败”了
+      - name: Fail job if autograder returned non-zero (optional)
         run: |
           code="${AUTOGRADER_EXIT_CODE:-0}"
           echo "autograder exit code: $code"
