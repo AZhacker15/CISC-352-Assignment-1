@@ -7,7 +7,7 @@
 # cagey_csp.py
 # desc:
 #
-
+from cspbase import *
 #Look for #IMPLEMENT tags in this file.
 '''
 All models need to return a CSP object, and a list of Variable objects
@@ -87,8 +87,39 @@ An example of a 3x3 puzzle would be defined as:
 from cspbase import *
 
 def binary_ne_grid(cagey_grid):
-    ##IMPLEMENT
-    pass
+    n, cages = cagey_grid  # cages unused in this model
+    dom = list(range(1, n + 1))
+
+    # 1) Create variables in row-major order
+    var_array = []
+    for r in range(1, n + 1):
+        for c in range(1, n + 1):
+            var_array.append(Variable(f"V{r},{c}", dom))
+
+    csp = CSP(f"binary_ne_grid_{n}", var_array)
+
+    # Precompute satisfying tuples for != over domain
+    ne_tuples = [(a, b) for a in dom for b in dom if a != b]
+
+    # 2) Row constraints: for each row, add binary != for every pair
+    for r in range(n):
+        row_vars = var_array[r * n:(r + 1) * n]
+        for i in range(n):
+            for j in range(i + 1, n):
+                con = Constraint(f"Row{r+1}_{i+1}!={j+1}", [row_vars[i], row_vars[j]])
+                con.add_satisfying_tuples(ne_tuples)
+                csp.add_constraint(con)
+
+    # 3) Column constraints: for each column, add binary != for every pair
+    for c in range(n):
+        col_vars = [var_array[r * n + c] for r in range(n)]
+        for i in range(n):
+            for j in range(i + 1, n):
+                con = Constraint(f"Col{c+1}_{i+1}!={j+1}", [col_vars[i], col_vars[j]])
+                con.add_satisfying_tuples(ne_tuples)
+                csp.add_constraint(con)
+
+    return csp, var_array
 
 
 def nary_ad_grid(cagey_grid):
