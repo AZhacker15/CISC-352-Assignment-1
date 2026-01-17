@@ -101,7 +101,27 @@ def prop_FC(csp, newVar=None):
        only one uninstantiated Variable. Remember to keep
        track of all pruned Variable,value pairs and return '''
     #IMPLEMENT
-    pass
+    removeDomain=[]
+    if not newVar:
+        constraints = csp.get_all_cons()
+    else:
+        constraints = csp.get_cons_with_var(newVar)
+    for c in constraints:
+        if c.get_n_unasgn() == 1:
+            uvar=c.get_unasgn_vars()[0]
+            if(uvar.cur_domain_size()==0):
+                return False, []
+            for domain in uvar.cur_domain():
+                if(not c.check_var_val(uvar, domain)):
+                    removeDomain.append(domain)
+            for v in removeDomain:
+                uvar.prune_value(v)
+
+    return True, removeDomain
+
+            
+
+
 
 
 def prop_GAC(csp, newVar=None):

@@ -1,0 +1,41 @@
+stages:
+  - grade
+
+grade_autograder:
+  stage: grade
+  image: python:3.11-slim
+
+  before_script:
+    - python -V
+    - if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+    - mkdir -p .gitlab
+
+  script:
+    # 1) ���� autograder�������Լ����� results.txt��
+    #    ͬʱ�� stdout/stderr Ҳ��һ�ݣ������Ų�
+    - python autograder_stu.py 2>&1 | tee run_stdout.txt
+
+    # 2) ������û���� results.txt��ֱ�ӱ���
+    - test -f results.txt
+
+    # 3) ���� results.txt������ grade_summary.txt + grade.env��
+    - python .gitlab/parse_resultes.py results.txt | tee grade_summary.txt
+
+    # 4) ��ӡ dotenv�������� job log �п���
+    - cat grade.env
+
+  artifacts:
+    when: always
+    expire_in: 7 days
+    paths:
+      - results.txt
+      - run_stdout.txt
+      - grade_summary.txt
+      - grade.env
+      - error_detail.txt
+    reports:
+      dotenv: grade.env
+
+  # ��ѡ��������ͷ֣�Ҳ������ GitLab CI/CD Variables ������ MIN_SCORE��
+  # variables:
+  #   MIN_SCORE: "1.5"
