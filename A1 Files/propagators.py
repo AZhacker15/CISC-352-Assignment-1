@@ -1,14 +1,15 @@
+from collections import deque
 # =============================
-# Student Names:
-# Group ID:
-# Date:
+# Student Names: Andrew, Lance
+# Group ID: 28
+# Date: 2026-01-17
 # =============================
 # CISC 352
 # propagators.py
 # desc:
 #
 
-from collections import deque
+
 #Look for #IMPLEMENT tags in this file. These tags indicate what has
 #to be implemented to complete problem solution.
 
@@ -80,9 +81,10 @@ from collections import deque
          for gac we initialize the GAC queue with all constraints containing V.
    '''
 
+
 def prop_BT(csp, newVar=None):
-    '''Do plain backtracking propagation. That is, do no
-    propagation at all. Just check fully instantiated constraints'''
+    """Do plain backtracking propagation. That is, do no
+    propagation at all. Just check fully instantiated constraints"""
 
     if not newVar:
         return True, []
@@ -96,22 +98,21 @@ def prop_BT(csp, newVar=None):
                 return False, []
     return True, []
 
+
 def prop_FC(csp, newVar=None):
     '''Do forward checking. That is check constraints with
-       only one uninstantiated Variable. Remember to keep
-       track of all pruned Variable,value pairs and return '''
-   pruned = []
-   gac_queue = deque()
-   pruned_con = []
-    
-   if newVar is None:
-      constraints = csp.get_all_cons()
-   else:
-      constraints = csp.get_cons_with_var(newVar)
+           only one uninstantiated Variable. Remember to keep
+           track of all pruned Variable,value pairs and return '''
+    pruned = []
 
-   for con in constraints:
-      if con.get_n_unasgn() == 1:
-         uvar = con.get_unasgn_vars()[0]
+    if newVar is None:
+        constraints = csp.get_all_cons()
+    else:
+        constraints = csp.get_cons_with_var(newVar)
+
+    for con in constraints:
+        if con.get_n_unasgn() == 1:
+            uvar = con.get_unasgn_vars()[0]
 
             # Iterate over a COPY because we may prune while iterating
             for val in list(uvar.cur_domain()):
@@ -125,6 +126,7 @@ def prop_FC(csp, newVar=None):
                 return False, pruned
 
     return True, pruned
+
 
 def prop_GAC(csp, newVar=None):
     '''Do GAC propagation. If newVar is None we do initial GAC enforce
@@ -157,4 +159,12 @@ def prop_GAC(csp, newVar=None):
                             gac_queue.append(con_2)
 
     return True, pruned_con
+
+
+
+
+
+
+
+
 
