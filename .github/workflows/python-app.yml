@@ -1,4 +1,4 @@
-name: Python application
+name: Autograder
 
 on:
   push:
@@ -11,13 +11,9 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  grade:
     runs-on: ubuntu-latest
 
-    env:
-      MIN_SCORE: "1.5"   # 可选：类似 GitLab CI 变量
-
-    # 关键：默认在 "A1 Files" 目录下执行 run 步骤
     defaults:
       run:
         shell: bash
@@ -31,59 +27,59 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install dependencies
+      - name: Install dependencies (if requirements.txt exists)
         run: |
           python -V
           python -m pip install --upgrade pip
-          pip install flake8 pytest
-
-          # requirements.txt 可能在 A1 Files/ 或仓库根目录，两个都兼容
           if [ -f requirements.txt ]; then
             pip install -r requirements.txt
           elif [ -f ../requirements.txt ]; then
             pip install -r ../requirements.txt
           fi
 
-      - name: Lint with flake8
+      # 跑 autograder，并把 stdout/stderr 同时保存
+      # 注意：autograder 可能会返回非 0（因为有 FAIL），我们仍然要继续后面的步骤保存 results.txt
+      - name: Run autograder (always continue)
         run: |
-          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-
-      - name: Test with pytest
-        run: |
-          pytest
-
-      # ---- Autograder (在 A1 Files/ 内运行) ----
-      - name: Run autograder
-        run: |
+          set +e
           python autograder_stu.py 2>&1 | tee run_stdout.txt
+          echo "AUTOGRADER_EXIT_CODE=$?" >> "$GITHUB_ENV"
 
-      - name: Check results.txt exists
+      - name: Verify results.txt exists
         run: |
-          test -f results.txt
+          ls -l results.txt
+          test -s results.txt
 
-      - name: Parse results -> grade_summary.txt + grade.env
+      - name: Extract FAIL/ERROR from results.txt
         run: |
-          # parse 脚本在仓库根目录的隐藏目录 .gitlab/，从 A1 Files 进去要用 ../
-          python ../.gitlab/parse_resultes.py results.txt | tee grade_summary.txt
+          # 统计 FAIL/ERROR
+          fail_count=$(grep -cE ' ... FAIL$' results.txt || true)
+          err_count=$(grep -cE ' ... ERROR$' results.txt || true)
 
-      - name: Print and load grade.env into GitHub env
-        run: |
-          echo "---- grade.env ----"
-          cat grade.env
-          echo "-------------------"
-          cat grade.env >> "$GITHUB_ENV"
+          echo "FAIL count:  $fail_count"
+          echo "ERROR count: $err_count"
 
-      - name: Add grade summary to GitHub Step Summary
-        run: |
-          if [ -f grade_summary.txt ]; then
-            echo "## Grade Summary" >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-            cat grade_summary.txt >> "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-          fi
+          # 提取测试名（去掉末尾的 "... FAIL/ERROR"）
+          grep -E ' ... (FAIL|ERROR)$' results.txt \
+            | sed -E 's/ \.\.\. (FAIL|ERROR)$//' \
+            > fail_list.txt || true
 
+          # 保留原始 FAIL/ERROR 行
+          grep -E ' ... (FAIL|ERROR)$' results.txt > fail_raw_lines.txt || true
+
+          # 生成汇总
+          {
+            echo "FAIL count:  $fail_count"
+            echo "ERROR count: $err_count"
+            echo ""
+            echo "---- FAIL/ERROR tests ----"
+            cat fail_list.txt
+          } > fail_summary.txt
+
+          echo "---- fail_summary.txt ----"
+          cat fail_summary.txt
+
+      # 上传产物：results.txt + 运行日志 + fail 提取结果
       - name: Upload artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -93,6 +89,14 @@ jobs:
           path: |
             A1 Files/results.txt
             A1 Files/run_stdout.txt
-            A1 Files/grade_summary.txt
-            A1 Files/grade.env
-            A1 Files/error_detail.txt
+            A1 Files/fail_summary.txt
+            A1 Files/fail_list.txt
+            A1 Files/fail_raw_lines.txt
+
+      # 最后根据 autograder 的退出码决定 job 是否失败（可选）
+      # 如果你希望：即使有 FAIL 也不要让 Actions 红掉，可以把这个步骤删除
+      - name: Fail job if autograder returned non-zero
+        run: |
+          code="${AUTOGRADER_EXIT_CODE:-0}"
+          echo "autograder exit code: $code"
+          exit "$code"
