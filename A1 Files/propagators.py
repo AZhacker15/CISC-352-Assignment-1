@@ -100,16 +100,19 @@ def prop_FC(csp, newVar=None):
     '''Do forward checking. That is check constraints with
        only one uninstantiated Variable. Remember to keep
        track of all pruned Variable,value pairs and return '''
-    pruned = []
+   pruned = []
 
-    if newVar is None:
-        constraints = csp.get_all_cons()
-    else:
-        constraints = csp.get_cons_with_var(newVar)
+   gac_queue = deque()
+   pruned_con = []
+    
+   if newVar is None:
+      constraints = csp.get_all_cons()
+   else:
+      constraints = csp.get_cons_with_var(newVar)
 
-    for con in constraints:
-        if con.get_n_unasgn() == 1:
-            uvar = con.get_unasgn_vars()[0]
+   for con in constraints:
+      if con.get_n_unasgn() == 1:
+         uvar = con.get_unasgn_vars()[0]
 
             # Iterate over a COPY because we may prune while iterating
             for val in list(uvar.cur_domain()):
@@ -124,13 +127,35 @@ def prop_FC(csp, newVar=None):
 
     return True, pruned
 
-            
-
-
-
-
 def prop_GAC(csp, newVar=None):
     '''Do GAC propagation. If newVar is None we do initial GAC enforce
-       processing all constraints. Otherwise we do GAC enforce with
+       processing all constraints. Otherwise, we do GAC enforce with
        constraints containing newVar on GAC Queue'''
-    pass
+    gac_queue = deque()
+    pruned_con = []
+
+    if newVar is None:
+        constraints = csp.get_all_cons()
+    else:
+        constraints = csp.get_cons_with_var(newVar)
+
+    for con in constraints:
+        gac_queue.append(con)
+
+    while gac_queue:
+        single_con = gac_queue.popleft()
+        for var in single_con.get_scope():
+            for single_val in var.cur_domain():
+                if not single_con.check_var_val(var, single_val):
+                    var.prune_value(single_val)
+                    pruned_con.append((var, single_val))
+
+                    if var.cur_domain_size() == 0:
+                        return False, pruned_con
+
+                    for con_2 in csp.get_cons_with_var(var):
+                        if con_2 not in gac_queue:
+                            gac_queue.append(con_2)
+
+    return True, pruned_con
+
