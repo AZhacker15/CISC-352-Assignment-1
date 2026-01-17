@@ -8,7 +8,7 @@
 # desc:
 #
 
-
+from collections import deque
 #Look for #IMPLEMENT tags in this file. These tags indicate what has
 #to be implemented to complete problem solution.
 
@@ -101,7 +101,6 @@ def prop_FC(csp, newVar=None):
        only one uninstantiated Variable. Remember to keep
        track of all pruned Variable,value pairs and return '''
    pruned = []
-
    gac_queue = deque()
    pruned_con = []
     
