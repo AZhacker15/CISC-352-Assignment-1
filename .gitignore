@@ -1,2 +1,1 @@
-git rm -r --cached __pycache__
-git commit -m "Ignore __pycache__"
+find "A1 Files" -type d -name "__pycache__" -print0 | xargs -0 git rm -r --cached
