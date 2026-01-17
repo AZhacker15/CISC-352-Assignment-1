@@ -1,0 +1,98 @@
+name: Python application
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    env:
+      MIN_SCORE: "1.5"   # 可选：类似 GitLab CI 变量
+
+    # 关键：默认在 "A1 Files" 目录下执行 run 步骤
+    defaults:
+      run:
+        shell: bash
+        working-directory: "A1 Files"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -V
+          python -m pip install --upgrade pip
+          pip install flake8 pytest
+
+          # requirements.txt 可能在 A1 Files/ 或仓库根目录，两个都兼容
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          elif [ -f ../requirements.txt ]; then
+            pip install -r ../requirements.txt
+          fi
+
+      - name: Lint with flake8
+        run: |
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+      - name: Test with pytest
+        run: |
+          pytest
+
+      # ---- Autograder (在 A1 Files/ 内运行) ----
+      - name: Run autograder
+        run: |
+          python autograder_stu.py 2>&1 | tee run_stdout.txt
+
+      - name: Check results.txt exists
+        run: |
+          test -f results.txt
+
+      - name: Parse results -> grade_summary.txt + grade.env
+        run: |
+          # parse 脚本在仓库根目录的隐藏目录 .gitlab/，从 A1 Files 进去要用 ../
+          python ../.gitlab/parse_resultes.py results.txt | tee grade_summary.txt
+
+      - name: Print and load grade.env into GitHub env
+        run: |
+          echo "---- grade.env ----"
+          cat grade.env
+          echo "-------------------"
+          cat grade.env >> "$GITHUB_ENV"
+
+      - name: Add grade summary to GitHub Step Summary
+        run: |
+          if [ -f grade_summary.txt ]; then
+            echo "## Grade Summary" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            cat grade_summary.txt >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: autograder-artifacts
+          retention-days: 7
+          path: |
+            A1 Files/results.txt
+            A1 Files/run_stdout.txt
+            A1 Files/grade_summary.txt
+            A1 Files/grade.env
+            A1 Files/error_detail.txt
