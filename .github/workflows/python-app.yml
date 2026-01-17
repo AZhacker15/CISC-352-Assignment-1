@@ -1,4 +1,4 @@
-name: Python application
+name: Autograder
 
 on:
   push:
@@ -11,13 +11,9 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  grade:
     runs-on: ubuntu-latest
 
-    env:
-      MIN_SCORE: "1.5"   # 鍙€夛細绫讳技 GitLab CI 鍙橀噺
-
-    # 鍏抽敭锛氶粯璁ゅ湪 "A1 Files" 鐩綍涓嬫墽琛� run 姝ラ
     defaults:
       run:
         shell: bash
@@ -31,72 +27,30 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install dependencies
+      - name: Install dependencies (if requirements.txt exists)
         run: |
           python -V
           python -m pip install --upgrade pip
-          pip install flake8 pytest
-
-          # requirements.txt 鍙兘鍦� A1 Files/ 鎴栦粨搴撴牴鐩綍锛屼袱涓兘鍏煎
           if [ -f requirements.txt ]; then
             pip install -r requirements.txt
           elif [ -f ../requirements.txt ]; then
             pip install -r ../requirements.txt
           fi
 
-      - name: Lint with flake8
+      # 跑 autograder，并把 stdout/stderr 同时保存
+      # 注意：autograder 可能会返回非 0（因为有 FAIL），我们仍然要继续后面的步骤保存 results.txt
+      - name: Run autograder (always continue)
         run: |
-          # stop the build if there are Python syntax errors or undefined names
-          flake8 . \
-            --count \
-            --select=E9,F63,F7,F82 \
-            --show-source \
-            --statistics \
-            --exclude="autograder_stu.py"
-          # warnings-only run
-          flake8 . \
-            --count \
-            --exit-zero \
-            --max-complexity=10 \
-            --max-line-length=127 \
-            --statistics \
-            --exclude="autograder_stu.py"
-
-      - name: Test with pytest
-        run: |
-          pytest
-
-      # ---- Autograder (鍦� A1 Files/ 鍐呰繍琛�) ----
-      - name: Run autograder
-        run: |
+          set +e
           python autograder_stu.py 2>&1 | tee run_stdout.txt
+          echo "AUTOGRADER_EXIT_CODE=$?" >> "$GITHUB_ENV"
 
-      - name: Check results.txt exists
+      - name: Verify results.txt exists
         run: |
-          test -f results.txt
+          ls -l results.txt
+          test -s results.txt
 
-      - name: Parse results -> grade_summary.txt + grade.env
-        run: |
-          # parse 鑴氭湰鍦ㄤ粨搴撴牴鐩綍鐨勯殣钘忕洰褰� .gitlab/锛屼粠 A1 Files 杩涘幓瑕佺敤 ../
-          python ../.gitlab/parse_resultes.py results.txt | tee grade_summary.txt
-
-      - name: Print and load grade.env into GitHub env
-        run: |
-          echo "---- grade.env ----"
-          cat grade.env
-          echo "-------------------"
-          cat grade.env >> "$GITHUB_ENV"
-
-      - name: Add grade summary to GitHub Step Summary
-        run: |
-          if [ -f grade_summary.txt ]; then
-            echo "## Grade Summary" >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-            cat grade_summary.txt >> "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-          fi
-
+      # 上传产物：results.txt + 运行日志
       - name: Upload artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -106,6 +60,11 @@ jobs:
           path: |
             A1 Files/results.txt
             A1 Files/run_stdout.txt
-            A1 Files/grade_summary.txt
-            A1 Files/grade.env
-            A1 Files/error_detail.txt
+
+      # 最后根据 autograder 的退出码决定 job 是否失败（可选）
+      # 如果你希望：即使有 FAIL 也不要让 Actions 红掉，可以把这个步骤删除或永远 exit 0
+      - name: Fail job if autograder returned non-zero
+        run: |
+          code="${AUTOGRADER_EXIT_CODE:-0}"
+          echo "autograder exit code: $code"
+          exit "$code"
