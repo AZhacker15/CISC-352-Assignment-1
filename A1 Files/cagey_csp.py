@@ -8,6 +8,8 @@
 # desc:
 #
 from cspbase import *
+from itertools import permutations, product
+from math import prod
 #Look for #IMPLEMENT tags in this file.
 '''
 All models need to return a CSP object, and a list of Variable objects
@@ -122,10 +124,207 @@ def binary_ne_grid(cagey_grid):
     return csp, var_array
 
 
+
 def nary_ad_grid(cagey_grid):
-    ## IMPLEMENT
-    pass
+    n, _ = cagey_grid
+    csp = CSP("N-ary Grid-only Cagey")
+
+    variables = {}
+    for row in range(1, n+1):
+        for col in range(1, n+1):
+            var = Variable(f"Cell({row},{col})", list(range(1, n+1)))
+            variables[(row, col)] = var
+            csp.add_var(var)
+    
+    # Rows
+    for row in range(1, n+1):
+        row_vars = [variables[(row, col)] for col in range(1, n+1)]
+        constraint = Constraint(f"R({row})", row_vars)
+        valid_assignments = list(permutations(range(1, n+1), n))
+        constraint.add_satisfying_tuples(valid_assignments)
+        csp.add_constraint(constraint)
+    
+    # Columns
+    for col in range(1, n+1):
+        col_vars = [variables[(row, col)] for row in range(1, n+1)]
+        constraint = Constraint(f"C({col})", col_vars)
+        valid_assignments = list(permutations(range(1, n+1), n))
+        constraint.add_satisfying_tuples(valid_assignments)
+        csp.add_constraint(constraint)
+    
+    return csp, list(variables.values())
+    """
+    Grid-only model using ONLY n-ary all-different constraints for each row/col.
+    Returns (csp, var_array) where var_array is row-major list of cell variables.
+    """
+  
+    """
+    Full Cagey model:
+      - Uses n-ary all-different for rows/cols (like nary_ad_grid)
+      - Adds one operator variable per cage
+      - Adds one cage constraint per cage over [op_var] + cage_cell_vars
+    Returns (csp, var_array) where var_array = all cell vars (row-major) + all cage op vars.
+    """
+    n, cages = cagey_grid
+    dom = list(range(1, n + 1))
+
+    # --- 1) create cell vars ---
+    cell_vars = []
+    for r in range(1, n + 1):
+        for c in range(1, n + 1):
+            cell_vars.append(Variable(f"Cell({r},{c})", dom))
+
+    # helper to access a cell var by (r,c) where r,c are 1-based
+    def get_cell(r, c):
+        return cell_vars[(r - 1) * n + (c - 1)]
+
+    # --- 2) create CSP with cell vars first ---
+    csp = CSP(f"cagey_csp_model_{n}", cell_vars[:])
+
+    # --- 3) add row/col all-different constraints ---
+    ad_tuples = list(permutations(dom, n))
+
+    for r in range(n):
+        row_vars = cell_vars[r * n:(r + 1) * n]
+        con = Constraint(f"RowAD({r+1})", row_vars)
+        con.add_satisfying_tuples(ad_tuples)
+        csp.add_constraint(con)
+
+    for c in range(n):
+        col_vars = [cell_vars[r * n + c] for r in range(n)]
+        con = Constraint(f"ColAD({c+1})", col_vars)
+        con.add_satisfying_tuples(ad_tuples)
+        csp.add_constraint(con)
+
+    # --- 4) cage constraints (with op variables) ---
+    op_vars = []
+    allowed_ops = ['+', '-', '*', '/', '%']
 
 def cagey_csp_model(cagey_grid):
-    ##IMPLEMENT
-    pass
+    """
+    Full Cagey model:
+      - Uses n-ary all-different for rows/cols (like nary_ad_grid)
+      - Adds one operator variable per cage
+      - Adds one cage constraint per cage over [op_var] + cage_cell_vars
+    Returns (csp, var_array) where var_array = all cell vars (row-major) + all cage op vars.
+    """
+    n, cages = cagey_grid
+    dom = list(range(1, n + 1))
+
+    # --- 1) create cell vars ---
+    cell_vars = []
+    for r in range(1, n + 1):
+        for c in range(1, n + 1):
+            cell_vars.append(Variable(f"Cell({r},{c})", dom))
+
+    # helper to access a cell var by (r,c) where r,c are 1-based
+    def get_cell(r, c):
+        return cell_vars[(r - 1) * n + (c - 1)]
+
+    # --- 2) create CSP with cell vars first ---
+    csp = CSP(f"cagey_csp_model_{n}", cell_vars[:])
+
+    # --- 3) add row/col all-different constraints ---
+    ad_tuples = list(permutations(dom, n))
+
+    for r in range(n):
+        row_vars = cell_vars[r * n:(r + 1) * n]
+        con = Constraint(f"RowAD({r+1})", row_vars)
+        con.add_satisfying_tuples(ad_tuples)
+        csp.add_constraint(con)
+
+    for c in range(n):
+        col_vars = [cell_vars[r * n + c] for r in range(n)]
+        con = Constraint(f"ColAD({c+1})", col_vars)
+        con.add_satisfying_tuples(ad_tuples)
+        csp.add_constraint(con)
+
+    # --- 4) cage constraints (with op variables) ---
+    op_vars = []
+    allowed_ops = ['+', '-', '*', '/', '%']
+
+    def eval_left_assoc(values, op):
+        """Return op applied left-associatively, or None if invalid (e.g., division not integer)."""
+        if op == '+':
+            return sum(values)
+        if op == '*':
+            return prod(values)
+        if op == '-':
+            res = values[0]
+            for v in values[1:]:
+                res -= v
+            return res
+        if op == '/':
+            res = values[0]
+            for v in values[1:]:
+                if v == 0 or res % v != 0:
+                    return None
+                res //= v
+            return res
+        return None
+
+    def satisfies_cage(target, vals, op):
+        """vals are assigned to the cage cells in some fixed order; we can permute them to satisfy."""
+        m = len(vals)
+
+        # 1-cell cage: must equal target, op can be anything valid
+        if m == 1:
+            return vals[0] == target
+
+        if op == '+':
+            return sum(vals) == target
+
+        if op == '*':
+            return prod(vals) == target
+
+        if op == '%':
+            # "modular addition": interpret as wrap-around on 1..n
+            # result in 1..n: ((sum-1) % n) + 1
+            return (((sum(vals) - 1) % n) + 1) == target
+
+        # '-' or '/': order matters, try permutations (dedup to avoid repeats)
+        for perm in set(permutations(vals, m)):
+            res = eval_left_assoc(list(perm), op)
+            if res is not None and res == target:
+                return True
+        return False
+
+    for (target, cell_coords, op_flag) in cages:
+        cage_cells = [get_cell(r, c) for (r, c) in cell_coords]
+
+        # operator domain
+        if op_flag in allowed_ops:
+            op_dom = [op_flag]
+        else:
+            # '?' or None or anything else treated as unknown
+            op_dom = allowed_ops[:]
+
+        # operator variable name format from API
+        var_refs = ", ".join([f"Var-Cell({r},{c})" for (r, c) in cell_coords])
+        op_name = f"Cage_op({target}:{op_flag}:[{var_refs}])"
+        op_var = Variable(op_name, op_dom)
+
+        # add op var to CSP and to returned array
+        csp.add_var(op_var)
+        op_vars.append(op_var)
+
+        # cage constraint: scope is [op_var] + cage_cells
+        scope = [op_var] + cage_cells
+        con = Constraint(f"CageCon({target}:{op_flag})", scope)
+
+        sat_tuples = []
+        m = len(cage_cells)
+
+        # enumerate possible assignments to cage cell vars
+        for vals in product(dom, repeat=m):
+            vals_list = list(vals)
+            for op in op_dom:
+                if satisfies_cage(target, vals_list, op):
+                    sat_tuples.append((op,) + tuple(vals_list))
+
+        con.add_satisfying_tuples(sat_tuples)
+        csp.add_constraint(con)
+
+    # var_array: all cells (row-major) then all op vars (in cage list order)
+    var_array = cell_vars + op_vars
+    return csp, var_array
