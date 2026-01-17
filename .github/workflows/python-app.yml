@@ -15,9 +15,9 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      MIN_SCORE: "1.5"   # 可选：类似 GitLab CI 变量
+      MIN_SCORE: "1.5"   # 鍙€夛細绫讳技 GitLab CI 鍙橀噺
 
-    # 关键：默认在 "A1 Files" 目录下执行 run 步骤
+    # 鍏抽敭锛氶粯璁ゅ湪 "A1 Files" 鐩綍涓嬫墽琛� run 姝ラ
     defaults:
       run:
         shell: bash
@@ -37,7 +37,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install flake8 pytest
 
-          # requirements.txt 可能在 A1 Files/ 或仓库根目录，两个都兼容
+          # requirements.txt 鍙兘鍦� A1 Files/ 鎴栦粨搴撴牴鐩綍锛屼袱涓兘鍏煎
           if [ -f requirements.txt ]; then
             pip install -r requirements.txt
           elif [ -f ../requirements.txt ]; then
@@ -46,14 +46,27 @@ jobs:
 
       - name: Lint with flake8
         run: |
-          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+          # stop the build if there are Python syntax errors or undefined names
+          flake8 . \
+            --count \
+            --select=E9,F63,F7,F82 \
+            --show-source \
+            --statistics \
+            --exclude="autograder_stu.py"
+          # warnings-only run
+          flake8 . \
+            --count \
+            --exit-zero \
+            --max-complexity=10 \
+            --max-line-length=127 \
+            --statistics \
+            --exclude="autograder_stu.py"
 
       - name: Test with pytest
         run: |
           pytest
 
-      # ---- Autograder (在 A1 Files/ 内运行) ----
+      # ---- Autograder (鍦� A1 Files/ 鍐呰繍琛�) ----
       - name: Run autograder
         run: |
           python autograder_stu.py 2>&1 | tee run_stdout.txt
@@ -64,7 +77,7 @@ jobs:
 
       - name: Parse results -> grade_summary.txt + grade.env
         run: |
-          # parse 脚本在仓库根目录的隐藏目录 .gitlab/，从 A1 Files 进去要用 ../
+          # parse 鑴氭湰鍦ㄤ粨搴撴牴鐩綍鐨勯殣钘忕洰褰� .gitlab/锛屼粠 A1 Files 杩涘幓瑕佺敤 ../
           python ../.gitlab/parse_resultes.py results.txt | tee grade_summary.txt
 
       - name: Print and load grade.env into GitHub env
