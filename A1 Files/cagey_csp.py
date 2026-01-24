@@ -85,15 +85,36 @@ An example of a 3x3 puzzle would be defined as:
 '''
 
 from cspbase import *
-
+from itertools import permutations
 def binary_ne_grid(cagey_grid):
     ##IMPLEMENT
     pass
 
 
 def nary_ad_grid(cagey_grid):
-    ## IMPLEMENT
-    pass
+    n=cagey_grid[0]
+    var_list=[]
+    for r in range(1,n+1):
+        for c in range(1,n+1):
+            new_var=Variable(f"Cell({r},{c})", list(range(1, n+1)))
+            var_list.append(new_var)        
+    newCSP=CSP("nary_ad_grid",var_list)
+    for r in range(1, n+1):
+        rvar=var_list[(r-1)*n : r*n]
+        new_constraint = Constraint(f"R({r})", rvar)
+        valid_assignments = list(permutations(range(1, n+1), n))
+        new_constraint.add_satisfying_tuples(valid_assignments)
+        newCSP.add_constraint(new_constraint)
+    
+    for c in range(1, n+1):
+        cvar=[var_list[(r-1)*n + (c-1)] for r in range(1, n+1)]
+        new_constraint = Constraint(f"C({c})", cvar)
+        valid_assignments = list(permutations(range(1, n+1), n))
+        new_constraint.add_satisfying_tuples(valid_assignments)
+        newCSP.add_constraint(new_constraint)
+            
+
+    return newCSP, var_list
 
 def cagey_csp_model(cagey_grid):
     ##IMPLEMENT
