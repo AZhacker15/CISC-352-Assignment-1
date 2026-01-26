@@ -85,10 +85,37 @@ An example of a 3x3 puzzle would be defined as:
 '''
 
 from cspbase import *
-from itertools import permutations
+from itertools import permutations, combinations
 def binary_ne_grid(cagey_grid):
     ##IMPLEMENT
-    pass
+    n, cages = cagey_grid
+    bin_array = []
+
+    for x in range(n * n):
+        var = Variable(str(x), list(range(1, n + 1)))
+        bin_array.append(var)
+
+    csp = CSP("B_array", bin_array)
+
+    for row in range(n):
+        row_index = [bin_array[row * n + col] for col in range(n)]
+        for varc1, varc2 in combinations(row_index, 2):
+            con = Constraint(f"Row {row}", [varc1, varc2])
+            allowed_row = [(right, left) for right in varc1.domain()
+                           for left in varc2.domain() if right != left]
+            con.add_satisfying_tuples(allowed_row)
+            csp.add_constraint(con)
+
+    for col in range(n):
+        col_index = [bin_array[row * n + col] for row in range(n)]
+        for varc1, varc2 in combinations(col_index, 2):
+            con = Constraint(f"Col {col}", [varc1, varc2])
+            allowed_col = [(right, left) for right in varc1.domain()
+                           for left in varc2.domain() if right != left]
+            con.add_satisfying_tuples(allowed_col)
+            csp.add_constraint(con)
+
+    return csp, bin_array
 
 
 def nary_ad_grid(cagey_grid):
