@@ -1,4 +1,5 @@
 import cagey_csp
 
-p=cagey_csp.nary_ad_grid((3, [(3,[(1,1), (2,1)],"+"),(1, [(1,2)], '?'), (8, [(1,3), (2,3), (2,2)], "+"), (3, [(3,1)], '?'), (3, [(3,2), (3,3)], "+")]))
-print(p)
+board = (2,[(6, [(1, 1), (1, 2), (2, 1), (2, 2)], '+')])
+csp, var_array = cagey_csp.cagey_csp_model(board)
+print(csp)

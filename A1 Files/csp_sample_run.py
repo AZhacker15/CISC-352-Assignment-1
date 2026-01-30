@@ -73,9 +73,9 @@ simpleCSP.add_constraint(c2)
 btracker = BT(simpleCSP)
 # btracker.trace_on()
 
-print("Plain Bactracking on simple CSP")
-btracker.bt_search(prop_BT)
-print("=======================================================")
+# print("Plain Bactracking on simple CSP")
+# btracker.bt_search(prop_BT)
+# print("=======================================================")
 # print("Forward Checking on simple CSP")
 # btracker.bt_search(prop_FC)
 # print("=======================================================")
@@ -214,10 +214,10 @@ def solve_graph_color(propType, trace=False):
 # ===============
 # Execution block
 # ===============
-trace = False
-print("Plain Backtracking on Colouring Australia")
-solve_graph_color('BT', trace)
-print("=========================================")
+# trace = False
+# print("Plain Backtracking on Colouring Australia")
+# solve_graph_color('BT', trace)
+# print("=========================================")
 # trace = False
 # print("Forward Checking on Colouring Australia")
 # solve_graph_color('FC', trace)
@@ -280,12 +280,31 @@ def solve_nQueens(n, propType, trace=False):
 
 trace = False
 #trace = False
-print("Plain Bactracking on 8-queens")
-solve_nQueens(16, 'BT', trace)
+# print("Plain Bactracking on 8-queens")
+# solve_nQueens(16, 'BT', trace)
+# print("=======================================================")
+# print("Forward Checking 8-queens")
+# solve_nQueens(8, 'FC', trace)
+# print("=======================================================")
+# print("GAC 8-queens")
+# solve_nQueens(8, 'GAC', trace)
+
+
+# ===============
+# GAC-Execution block
+# ===============
+
 print("=======================================================")
-#print("Forward Checking 8-queens")
-#solve_nQueens(8, 'FC', trace)
-#print("=======================================================")
-#print("GAC 8-queens")
-#solve_nQueens(8, 'GAC', trace)
+btracker.trace_on()
+print("GAC on simple CSP")
+btracker.bt_search(prop_GAC)
+
+print("GAC on Colouring Australia")
+solve_graph_color('GAC', trace)
+print("=========================================")
+
+print("=======================================================")
+print("GAC 8-queens")
+solve_nQueens(8, 'GAC', trace)
+
 

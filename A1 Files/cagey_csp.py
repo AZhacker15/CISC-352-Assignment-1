@@ -84,8 +84,9 @@ An example of a 3x3 puzzle would be defined as:
 
 '''
 
+from math import prod
 from cspbase import *
-from itertools import permutations
+from itertools import permutations, product
 def binary_ne_grid(cagey_grid):
     ##IMPLEMENT
     pass
@@ -116,6 +117,75 @@ def nary_ad_grid(cagey_grid):
 
     return newCSP, var_list
 
+
 def cagey_csp_model(cagey_grid):
-    ##IMPLEMENT
-    pass
+    csp, variable_list = nary_ad_grid(cagey_grid)
+    n, cages = cagey_grid
+
+
+    var = {}
+    for r in range(1, n + 1):
+        for c in range(1, n + 1):
+            var[(r, c)] = variable_list[(r - 1) * n + (c - 1)]
+
+    operation_vars = []
+    for (val, cells, operation) in cages:
+        if operation == "?":
+            operation_d = ['+', '-', '*', '/', '%']
+        else:
+            operation_d = [operation]
+
+        cell_name = ", ".join([f"Var-Cell({r},{c})" for (r, c) in cells])
+        operation_var_name = f"Cage_op({val}:{operation}:[{cell_name}])"
+
+        operation_var = Variable(operation_var_name, operation_d)
+        csp.add_var(operation_var)
+        operation_vars.append(operation_var)
+
+        cage_cell_vars = [var[(r, c)] for (r, c) in cells]
+        scope = cage_cell_vars + [operation_var]
+        cage_constraint = Constraint(f"Cage{val, cells, operation}", scope)
+
+        c_domain_list = [ccv.cur_domain() for ccv in cage_cell_vars]
+        valid_assignment = []
+
+        for assignment in product(*c_domain_list):
+            for op in operation_d:
+                if op == '+':
+                    if sum(assignment) == val:
+                        valid_assignment.append(assignment + (op,))
+
+                elif op == '*':
+                    if prod(assignment) == val:
+                        valid_assignment.append(assignment + (op,))
+
+                elif op == '-':
+                    if any(perm[0] - sum(perm[1:]) == val for perm in permutations(assignment)):
+                        valid_assignment.append(assignment + (op,))
+
+                elif op == '/':
+                    ok = False
+                    for perm in permutations(assignment):
+                        current = perm[0]
+                        valid = True
+                        for x in perm[1:]:
+                            if x == 0 or (current % x != 0):
+                                valid = False
+                                break
+                            current //= x
+                        if valid and current == val:
+                            ok = True
+                            break
+                    if ok:
+                        valid_assignment.append(assignment + (op,))
+
+                elif op == '%':
+                    mod_sum = ((sum(assignment) - 1) % n) + 1
+                    if mod_sum == val:
+                        valid_assignment.append(assignment + (op,))
+
+        cage_constraint.add_satisfying_tuples(valid_assignment)
+        csp.add_constraint(cage_constraint)
+
+    variable_list.extend(operation_vars)
+    return csp, variable_list
